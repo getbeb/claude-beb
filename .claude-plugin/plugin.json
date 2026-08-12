@@ -1,0 +1,17 @@
+{
+  "name": "claude-beb",
+  "version": "0.1.0",
+  "description": "Event-driven beb mail for Claude Code: wake on arrival when idle, deliver at the turn boundary when busy",
+  "author": {
+    "name": "Yanuar Aristya Edy Putra"
+  },
+  "homepage": "https://getbeb.dev",
+  "license": "MIT",
+  "keywords": [
+    "beb",
+    "mail",
+    "agents",
+    "messaging",
+    "hooks"
+  ]
+}

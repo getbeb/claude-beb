@@ -1,0 +1,19 @@
+{
+  "name": "getbeb",
+  "description": "beb integrations for Claude Code",
+  "owner": {
+    "name": "getbeb",
+    "url": "https://github.com/getbeb"
+  },
+  "plugins": [
+    {
+      "name": "claude-beb",
+      "source": "./",
+      "description": "Event-driven beb mail for Claude Code: wake on arrival when idle, deliver at the turn boundary when busy.",
+      "homepage": "https://getbeb.dev",
+      "repository": "https://github.com/getbeb/claude-beb",
+      "license": "MIT",
+      "keywords": ["beb", "mail", "agents", "messaging", "hooks"]
+    }
+  ]
+}

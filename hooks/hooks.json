@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/beb-drain.sh",
+            "timeout": 15,
+            "statusMessage": "beb: checking mail"
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/beb-doorbell.sh",
+            "async": true,
+            "asyncRewake": true,
+            "timeout": 90000,
+            "statusMessage": "beb: listening for mail"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/beb-drain.sh",
+            "timeout": 15,
+            "statusMessage": "beb: checking mail"
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/beb-doorbell.sh",
+            "async": true,
+            "asyncRewake": true,
+            "timeout": 90000,
+            "statusMessage": "beb: listening for mail"
+          }
+        ]
+      }
+    ]
+  }
+}
