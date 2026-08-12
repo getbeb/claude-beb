@@ -73,10 +73,12 @@ Two hook scripts, both armed on SessionStart and Stop:
   boundary re-arms. `beb wait` is edge-triggered, so standing unread
   mail never re-wakes the session: one arrival, one wake.
 
-Each newly armed doorbell supersedes the last (recorded pid, live
-command line match), so re-arms and plugin reloads never leave two
-doorbells parked. The wait is bounded by `CLAUDE_BEB_WAIT_SECS`
-(default a day). The full reasoning is in [DESIGN.md](DESIGN.md).
+Each newly armed doorbell writes a fresh per-session ownership
+token; older doorbells notice they no longer own the session and
+exit silently — no process is ever killed by pid. Re-arms and
+plugin reloads therefore never leave two doorbells ringing. The
+total wait is bounded by `CLAUDE_BEB_WAIT_SECS` (default a day).
+The full reasoning is in [DESIGN.md](DESIGN.md).
 
 ## License
 
