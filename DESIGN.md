@@ -39,8 +39,11 @@ per invocation, re-armed at each boundary).
    supersedes the last and a reloaded plugin cannot leave a stale
    wake channel ringing. Everything else claude-beb knows it learns
    from beb at the moment it looks.
-6. No identity, no activity. A directory without a `.beb` makes
-   every hook exit silently.
+6. No identity, no activity. Every hook stands as whatever identity
+   beb resolves for the session's process — the working directory's
+   `.beb`, or `BEB_IDENTITY` in Claude Code's environment, which
+   hooks inherit; the resolution is beb's, never claude-beb's. Where
+   beb resolves nobody, every hook exits silently.
 
 ## Behavior
 
@@ -76,7 +79,7 @@ user has. claude-beb adds no verbs, no tools, and no reply path.
 Consuming on the agent's behalf, delivering bodies, filesystem
 watching from hook processes, presence, multiple identities per
 session, remote mailboxes. Whatever claude-beb cannot learn by
-running beb in the session's directory, it does not know.
+running beb as the session's identity, it does not know.
 
 ## Design test
 

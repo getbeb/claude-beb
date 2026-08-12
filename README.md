@@ -29,6 +29,9 @@ Run Claude Code in a directory that is a beb identity:
 ```sh
 cd ~/work/backend    # has .beb, from beb init
 claude
+
+# or, for a claude launched where cd is not available:
+BEB_IDENTITY=~/work/backend claude
 ```
 
 That is the whole setup. Mail waiting at a session start or turn end
@@ -47,7 +50,13 @@ correspondents with beb's own verbs; claude-beb adds no verbs and no
 tools, and it never consumes mail: the cursor moves only when the
 agent runs `beb read` itself.
 
-In a directory without a `.beb`, every hook exits silently.
+If `beb whoami` cannot resolve an identity, every hook exits
+silently.
+
+For interactive use, running claude from the identity directory is
+enough. For long-lived agent sessions that change working directory,
+set `BEB_IDENTITY` when starting claude: it pins identity to the
+process tree, which hooks inherit, while the cwd wanders freely.
 
 ## How it works
 
