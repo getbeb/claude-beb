@@ -35,10 +35,13 @@ per invocation, re-armed at each boundary).
    edge-triggered by contract, so mail that merely sits unread is
    re-announced at each boundary instead of re-waking the session.
    One arrival, one wake, no wake loops.
-5. State is one pidfile per session, so each newly armed doorbell
-   supersedes the last and a reloaded plugin cannot leave a stale
-   wake channel ringing. Everything else claude-beb knows it learns
-   from beb at the moment it looks.
+5. State is one token file per session. Each arm writes a fresh
+   token, last writer wins, and every doorbell re-checks ownership
+   at each waking moment: a superseded doorbell exits on its own,
+   silently. Nothing is ever killed by pid — process-id reuse can
+   never reach an innocent — and simultaneous arms converge to one
+   owner under any interleaving. Everything else claude-beb knows
+   it learns from beb at the moment it looks.
 6. No identity, no activity. Every hook stands as whatever identity
    beb resolves for the session's process — the working directory's
    `.beb`, or `BEB_IDENTITY` in Claude Code's environment, which
@@ -62,13 +65,16 @@ announcement repeats at each boundary until the agent reads, because
 reading is what makes it true to stop saying.
 
 The doorbell (asyncRewake) is `beb wait` with an exit code: it
-parks on the kernel watch until the next message arrives, confirms
-with `list` that something stands unread, and exits 2 with one line
-naming the next step; the harness wakes the session and the agent
-reads. A timeout is a silent exit 0: no mail, no wake, and the next
-boundary arms a fresh doorbell. A doorbell is superseded on every
-arm: the previous one, found by recorded pid and live command line,
-is killed before the new one parks. The wait is bounded and
+parks on the kernel watch, in short legs, and exits 2 with one line
+naming the next step when mail has arrived; the harness wakes the
+session and the agent reads. Arrival is judged by content: `list`
+at arm time is the baseline, and a ring needs a changed, non-empty
+list — standing unread never re-rings (the drain owns it), and mail
+consumed by another integration before we looked is silence. A
+timeout is a silent exit 0; the next boundary arms afresh. A
+doorbell is superseded by ownership, never force: the new arm
+writes its token, and the old doorbell notices at its next waking
+moment and exits on its own. The total wait is bounded and
 overridable (`CLAUDE_BEB_WAIT_SECS`, default a day).
 
 The agent answers mail with the same four beb verbs every other beb

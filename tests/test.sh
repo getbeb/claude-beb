@@ -73,7 +73,7 @@ ok "standing unread: doorbell stays quiet, times out clean"
 
 printf '%s' "$EV" | (cd "$S/a" && CLAUDE_BEB_WAIT_SECS=15 "$BELL") >"$OUT" 2>"$ERR" &
 BPID=$!
-sleep 1
+sleep 2 # past the arm's converge beat, so the wait is parked
 (cd "$S/b" && "$BEB" send "$A" "ding") >/dev/null || die "send ding"
 t0=$(date +%s)
 wait $BPID
@@ -91,14 +91,26 @@ D1=$!
 sleep 1
 printf '%s' "$EV" | (cd "$S/a" && CLAUDE_BEB_WAIT_SECS=30 "$BELL") >"$OUT" 2>"$S/e2.txt" &
 D2=$!
-sleep 1
-kill -0 $D1 2>/dev/null && die "first doorbell survived the second arm"
+sleep 2
 (cd "$S/b" && "$BEB" send "$A" "dong") >/dev/null || die "send dong"
 wait $D1; r1=$?
 wait $D2; r2=$?
 test "$r1" = 0 || die "superseded doorbell woke (rc=$r1)"
 test "$r2" = 2 || die "live doorbell did not wake (rc=$r2)"
-ok "supersession: old doorbell dies quiet, only the live one wakes"
+ok "supersession by ownership: old doorbell exits itself, only the owner wakes"
+
+# ---- doorbell: concurrent arms converge to one -------------------------
+
+printf '%s' "$EV" | (cd "$S/a" && CLAUDE_BEB_WAIT_SECS=30 "$BELL") >"$OUT" 2>"$S/c1.txt" &
+C1=$!
+printf '%s' "$EV" | (cd "$S/a" && CLAUDE_BEB_WAIT_SECS=30 "$BELL") >"$OUT" 2>"$S/c2.txt" &
+C2=$!
+sleep 3
+(cd "$S/b" && "$BEB" send "$A" "race ding") >/dev/null || die "send race ding"
+wait $C1; c1=$?
+wait $C2; c2=$?
+test "$((c1 + c2))" = 2 || die "concurrent arms: rc $c1 and $c2, want exactly one 2"
+ok "concurrent arms: exactly one doorbell survives and wakes"
 
 # ---- doorbell: no identity ---------------------------------------------
 

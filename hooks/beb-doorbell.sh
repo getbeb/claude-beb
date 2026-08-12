@@ -7,15 +7,20 @@
 # read, not handed mail: delivery is the drain's job at the boundary and
 # the cursor belongs to the agent's own `beb read`.
 #
-# `beb wait` is edge-triggered by contract: mail already standing unread
-# never fires it (the drain announces that at each boundary), only the
-# next arrival does. One arrival, one wake, no wake loops.
+# Ownership, not supersession-by-kill: each arm writes a fresh token to
+# the session's file, last writer wins, and every doorbell re-reads the
+# file at each waking moment — a doorbell that no longer holds the token
+# exits on its own, silently. Nothing is ever killed by pid, so
+# process-id reuse can never reach an innocent process, and any
+# interleaving of simultaneous arms converges to exactly one owner. The
+# wait runs in short legs so a superseded doorbell lingers minutes, not
+# a day.
 #
-# A doorbell is superseded on every arm: the previous one, found by
-# recorded pid and live command line, is killed before the new one
-# parks, so a reloaded plugin or a queue of re-arms can never ring
-# twice. No session id on stdin means no reaping: killing across
-# sessions is worse than a stale doorbell.
+# Arrival is judged by content, not by the wait alone: `beb list` at arm
+# time is the baseline, and a ring needs the list to be non-empty AND
+# changed — so standing unread never re-rings (the boundary drain owns
+# that), and mail consumed by another integration before we looked is
+# silence, not a stale wake.
 set -u
 BEB="${BEB_BIN:-beb}"
 
@@ -24,34 +29,42 @@ BEB="${BEB_BIN:-beb}"
 
 sid=$(sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' 2>/dev/null | head -n 1)
 den="${TMPDIR:-/tmp}/claude-beb-doorbells.$(id -u)"
+own="$den/$sid"
+token="$$.$(od -An -N4 -tx4 /dev/urandom 2>/dev/null | tr -d ' \t')"
+
 if [ -n "$sid" ]; then
     mkdir -p "$den"
-    if [ -f "$den/$sid" ]; then
-        while IFS= read -r opid; do
-            case $opid in '' | *[!0-9]*) continue ;; esac
-            case $(ps -o command= -p "$opid" 2>/dev/null) in
-            *"beb wait"*) kill "$opid" 2>/dev/null ;;
-            esac
-        done <"$den/$sid"
-        rm -f "$den/$sid"
-    fi
+    printf '%s\n' "$token" >"$own"
+    # Concurrent arms both write before either reads; re-reading after a
+    # beat leaves exactly one owner under any interleaving.
+    sleep 1
+    [ "$(head -n 1 "$own" 2>/dev/null)" = "$token" ] || exit 0
 fi
 
-# Park. The recorded pid is the `beb wait` child itself, so the next arm
-# can supersede this doorbell by killing exactly that process; a killed
-# wait comes back nonzero and this doorbell stands down in silence.
-"$BEB" wait -t "${CLAUDE_BEB_WAIT_SECS:-86400}" &
-wpid=$!
-[ -n "$sid" ] && printf '%s\n' "$wpid" >"$den/$sid" 2>/dev/null
-wait "$wpid"
-rc=$?
-[ -n "$sid" ] && rm -f "$den/$sid" 2>/dev/null
+owned() { [ -z "$sid" ] || [ "$(head -n 1 "$own" 2>/dev/null)" = "$token" ]; }
 
-# Timeout, refusal, or superseded: quiet. The next boundary re-arms.
-[ "$rc" -eq 0 ] || exit 0
-# Confirm something still stands unread at wake time; delivered-elsewhere
-# silence is correct silence.
-[ -n "$("$BEB" list 2>/dev/null)" ] || exit 0
+total="${CLAUDE_BEB_WAIT_SECS:-86400}"
+leg=900
+[ "$total" -lt "$leg" ] && leg=$total
+start=$(date +%s)
+base=$("$BEB" list 2>/dev/null)
 
-echo "beb mail is waiting; read it with: beb read" >&2
-exit 2
+while :; do
+    t0=$(date +%s)
+    "$BEB" wait -t "$leg"
+    rc=$?
+    owned || exit 0
+    now=$(date +%s)
+    cur=$("$BEB" list 2>/dev/null)
+    if [ -n "$cur" ] && [ "$cur" != "$base" ]; then
+        [ -n "$sid" ] && rm -f "$own"
+        echo "beb mail is waiting; read it with: beb read" >&2
+        exit 2
+    fi
+    # A wait that came back non-zero long before its leg elapsed is a
+    # refusal (mailbox gone, beb missing), not a timeout: stand down
+    # quietly, the next boundary re-arms.
+    [ "$rc" -ne 0 ] && [ $((now - t0)) -lt 5 ] && exit 0
+    [ $((now - start)) -ge "$total" ] && exit 0
+    base=$cur
+done

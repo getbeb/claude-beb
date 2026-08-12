@@ -15,8 +15,9 @@ announced there. Nothing ever lands mid-turn.
 /plugin install claude-beb@getbeb
 ```
 
-beb itself must be on PATH, version 0.2.0 or newer (`wait` is what
-the doorbell parks on):
+beb itself must be on PATH, version 0.3.0 or newer — the first
+release carrying the complete contract this plugin rests on (`wait`
+for the doorbell, `BEB_IDENTITY` for identity):
 
 ```sh
 curl -fsSL https://getbeb.dev/install.sh | sh

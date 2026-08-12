@@ -7,9 +7,8 @@
 # cursor moves only by the agent's own act, and the announcement repeats
 # at each boundary until reading makes it stop being true.
 #
-# beb resolves identity from the working directory (./.beb); nothing is
-# configured here. No identity or no mail is a silent exit 0, so a quiet
-# boundary stays quiet.
+# beb resolves identity; this hook doesn't. No identity or no mail is a
+# silent exit 0, so a quiet boundary stays quiet.
 #
 # Hook input arrives as JSON on stdin. The only thing read from it is the
 # event name, echoed back so the output is valid for whichever hook
