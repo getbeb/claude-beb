@@ -20,10 +20,17 @@ input=$(cat)
 event=$(printf '%s' "$input" | sed -n 's/.*"hook_event_name"[[:space:]]*:[[:space:]]*"\([A-Za-z]*\)".*/\1/p')
 [ -n "$event" ] || event="Stop"
 
-unread=$("$BEB" list 2>/dev/null) || exit 0
+# `beb list` pages: the rows are stdout, and how much was NOT shown is
+# on stderr with every other line beb says about them. Taking only
+# stdout would hand back ten rows of twenty-five and call it the mail.
+# Every line beb writes to stderr begins `beb: `, so one capture splits
+# cleanly into the artifact and what is said about it.
+out=$("$BEB" list 2>&1) || exit 0
+unread=$(printf '%s\n' "$out" | grep -v '^beb:')
 [ -n "$unread" ] || exit 0
+summary=$(printf '%s\n' "$out" | sed -n 's/^beb: //p' | head -n 1)
 
-msg="[beb] mail waits:
+msg="[beb] mail waits: $summary
 $unread
 read with: beb read"
 

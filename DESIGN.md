@@ -43,10 +43,17 @@ per invocation, re-armed at each boundary).
    owner under any interleaving. Everything else claude-beb knows
    it learns from beb at the moment it looks.
 6. No identity, no activity. Every hook stands as whatever identity
-   beb resolves for the session's process — the working directory's
-   `.beb`, or `BEB_IDENTITY` in Claude Code's environment, which
-   hooks inherit; the resolution is beb's, never claude-beb's. Where
-   beb resolves nobody, every hook exits silently.
+   beb resolves for the session's process — `BEB_IDENTITY` in Claude
+   Code's environment, which hooks inherit; the resolution is beb's,
+   never claude-beb's. Where beb resolves nobody, every hook exits
+   silently.
+
+   beb 0.6.0 reads the pin and nothing else. It resolved the working
+   directory as well until then, which is why 7 could once skip a
+   directory that was not yet an identity: beb's own "no .beb here"
+   was the better sentence. It no longer says that, so the pin is
+   written either way and the refusal names the directory and the
+   command that fixes it.
 7. The session is pinned to the directory it began in. An agent's
    working directory is not a place it stays: it moves between
    subdirectories, spawns shells, hands work to subagents, and each
@@ -57,10 +64,10 @@ per invocation, re-armed at each boundary).
 
    This does not make claude-beb the resolver, and 6 still holds: it
    opens no key, reads no roster, and chooses between no candidates.
-   It records where the session started. beb decides who lives there,
-   and refuses if the answer is nobody or two. An operator who
-   launched with `BEB_IDENTITY` already said who they are, and the
-   pin never argues with them.
+   It records where the session started. beb decides who lives there
+   and refuses if the answer is nobody. An operator who launched with
+   `BEB_IDENTITY` already said who they are, and the pin never argues
+   with them.
 
    SessionStart alone. The same variable is offered on `CwdChanged`,
    and writing it there would re-pin on every directory change, which
@@ -70,7 +77,11 @@ per invocation, re-armed at each boundary).
 
 Two hooks, both armed on SessionStart and Stop.
 
-The drain (synchronous) asks `beb list`. Unread mail becomes
+The drain (synchronous) asks `beb list`, which pages: the rows are
+stdout and how much was not shown is on stderr, so the drain takes
+both and carries beb's summary line into the announcement. Ten rows
+of twenty-five handed back without the count would read as all of the
+mail. Unread mail becomes
 additional context in the same shape at either boundary:
 
     [beb] mail waits:

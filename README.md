@@ -15,9 +15,10 @@ announced there. Nothing ever lands mid-turn.
 /plugin install claude-beb@getbeb
 ```
 
-beb itself must be on PATH, version 0.3.0 or newer — the first
-release carrying the complete contract this plugin rests on (`wait`
-for the doorbell, `BEB_IDENTITY` for identity):
+beb itself must be on PATH, version 0.6.0 or newer — the first
+release carrying the complete contract this plugin rests on
+(`BEB_IDENTITY` for identity, and `wait --from` so a doorbell can
+hold its own mark):
 
 ```sh
 curl -fsSL https://getbeb.dev/install.sh | sh
@@ -44,9 +45,9 @@ That is the whole setup. Mail waiting at a session start or turn end
 is announced as context:
 
 ```
-[beb] mail waits:
-3  frontend
-4  ssh-ed25519 AAAA...
+[beb] mail waits: cursor at 2; 4 total, 2 unread; showing 2
+3  4h   deploy blocked   frontend
+4  12m  schema question  ssh-ed25519 AAAA...
 read with: beb read
 ```
 
@@ -60,7 +61,8 @@ If `beb whoami` cannot resolve an identity, every hook exits
 silently.
 
 For interactive use, running claude from the identity directory is
-enough. For long-lived agent sessions that change working directory,
+enough: the pin hook records it at SessionStart, and beb reads only
+the pin. For long-lived agent sessions that change working directory,
 set `BEB_IDENTITY` when starting claude: it pins identity to the
 process tree, which hooks inherit, while the cwd wanders freely.
 

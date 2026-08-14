@@ -36,11 +36,14 @@ input=$(cat 2>/dev/null) || input=""
 dir=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
 [ -n "$dir" ] || dir=$(pwd)
 
-# Only a directory that is already an identity. Writing a pin for a
-# directory with no .beb would turn beb's honest "no .beb here" into
-# "BEB_IDENTITY has no .beb", which is a worse sentence about the same
-# nothing.
-[ -d "$dir/.beb" ] || exit 0
+# Pinned whether or not the directory is an identity yet. The guard used
+# to skip a bare directory, because beb resolved the working directory
+# and its own "no .beb here" was the better sentence. beb 0.6.0 reads
+# nothing but the pin, so an unpinned session gets the generic
+# "BEB_IDENTITY is not set" instead, while a pinned one gets the
+# specific "BEB_IDENTITY=/path has no .beb; make one with: (cd /path &&
+# beb init)" -- which names the directory and the command. The pin is
+# what turns a nothing into an answerable nothing.
 
 # Single-quote the value and escape any quote inside it, so a path with
 # spaces or punctuation survives being sourced.

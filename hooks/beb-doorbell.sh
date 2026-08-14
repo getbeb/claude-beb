@@ -16,11 +16,14 @@
 # wait runs in short legs so a superseded doorbell lingers minutes, not
 # a day.
 #
-# Arrival is judged by content, not by the wait alone: `beb list` at arm
-# time is the baseline, and a ring needs the list to be non-empty AND
-# changed — so standing unread never re-rings (the boundary drain owns
-# that), and mail consumed by another integration before we looked is
-# silence, not a stale wake.
+# Arrival is judged by a mark, not by the wait alone. `beb wait` marks
+# from the reader's cursor by default, which would ring for standing
+# mail the boundary drain already announced — and ring again at every
+# arm, waking a session forever for mail it was told about. So the arm
+# takes a mark of its own with `--timeout 0`, one past everything that
+# exists, and every leg waits `--from` it: a leg boundary drops nothing,
+# and mail consumed by another integration before we looked is silence
+# rather than a stale wake.
 set -u
 BEB="${BEB_BIN:-beb}"
 
@@ -47,24 +50,33 @@ total="${CLAUDE_BEB_WAIT_SECS:-86400}"
 leg=900
 [ "$total" -lt "$leg" ] && leg=$total
 start=$(date +%s)
-base=$("$BEB" list 2>/dev/null)
+
+# One past everything present at arm time. beb prints it whether or not
+# anything was waiting, so this bootstraps against an empty mailbox too.
+mark=$("$BEB" wait --timeout 0 2>/dev/null)
+[ -n "$mark" ] || exit 0
 
 while :; do
-    t0=$(date +%s)
-    "$BEB" wait -t "$leg"
+    next=$("$BEB" wait --from "$mark" --timeout "$leg" 2>/dev/null)
     rc=$?
     owned || exit 0
-    now=$(date +%s)
-    cur=$("$BEB" list 2>/dev/null)
-    if [ -n "$cur" ] && [ "$cur" != "$base" ]; then
-        [ -n "$sid" ] && rm -f "$own"
-        echo "beb mail is waiting; read it with: beb read" >&2
-        exit 2
-    fi
-    # A wait that came back non-zero long before its leg elapsed is a
-    # refusal (mailbox gone, beb missing), not a timeout: stand down
-    # quietly, the next boundary re-arms.
-    [ "$rc" -ne 0 ] && [ $((now - t0)) -lt 5 ] && exit 0
-    [ $((now - start)) -ge "$total" ] && exit 0
-    base=$cur
+    [ -n "$next" ] && mark=$next
+
+    # beb's exit codes say which of the three happened, so nothing here
+    # has to time the wait and guess: 0 something landed, 2 the leg
+    # elapsed, anything else a refusal (no mailbox, no identity, no beb).
+    case $rc in
+        0)
+            # Still unread? Mail taken by another integration between the
+            # wait returning and this check is silence, not a stale wake.
+            if "$BEB" wait --timeout 0 >/dev/null 2>&1; then
+                [ -n "$sid" ] && rm -f "$own"
+                echo "beb mail is waiting; read it with: beb read" >&2
+                exit 2
+            fi
+            ;;
+        2) ;;
+        *) exit 0 ;;
+    esac
+    [ $(( $(date +%s) - start )) -ge "$total" ] && exit 0
 done
