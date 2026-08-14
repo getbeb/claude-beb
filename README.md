@@ -30,8 +30,13 @@ Run Claude Code in a directory that is a beb identity:
 ```sh
 cd ~/work/backend    # has .beb, from beb init
 claude
+```
 
-# or, for a claude launched where cd is not available:
+The session is pinned to that directory at start, so moving around
+during the session, in subshells or subagents, does not change who
+signs. To pin somewhere else, say so and the pin steps aside:
+
+```sh
 BEB_IDENTITY=~/work/backend claude
 ```
 

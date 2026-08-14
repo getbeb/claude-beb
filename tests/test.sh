@@ -5,11 +5,16 @@ set -u
 
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 DRAIN=$HERE/hooks/beb-drain.sh
+PIN=$HERE/hooks/beb-identity.sh
 BELL=$HERE/hooks/beb-doorbell.sh
 BEB=${BEB_BIN:-beb}
 export BEB_BIN=$BEB
 
 S=$(mktemp -d)
+# BEB_IDENTITY too: these run on machines that use beb, and a pinned
+# identity inherited from the caller would answer for every command in
+# the suite. The pin tests set it per-invocation, deliberately.
+unset BEB_IDENTITY 2>/dev/null || true
 export XDG_CONFIG_HOME=$S/config XDG_DATA_HOME=$S/data
 export TMPDIR=$S/tmp
 mkdir -p "$S/config/beb" "$S/tmp" "$S/a" "$S/b" "$S/bare"
@@ -60,6 +65,48 @@ ok "mail waiting: drain announces list as additionalContext"
 printf '%s' "$EV" | (cd "$S/a" && "$DRAIN") >"$S/out2.txt" 2>"$ERR" || die "drain rerun failed"
 cmp -s "$OUT" "$S/out2.txt" || die "drain is not idempotent"
 ok "drain never consumes: rerun announces the same mail"
+
+# ---- identity: pin the session to where it started ---------------------
+
+# An agent's working directory is not a place it stays. The pin is
+# written once, from the directory the session began in, so a later cd
+# moves the shell and not the signer.
+ENVF=$S/envfile
+: >"$ENVF"
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/a" |
+    CLAUDE_ENV_FILE=$ENVF BEB_IDENTITY= "$PIN" >"$OUT" 2>"$ERR" || die "pin failed: $(cat "$ERR")"
+grep -q "BEB_IDENTITY=" "$ENVF" || die "pin wrote nothing: [$(cat "$ENVF")]"
+( . "$ENVF"; [ "$BEB_IDENTITY" = "$S/a" ] ) || die "pin value wrong: $(cat "$ENVF")"
+ok "SessionStart pins the launch directory, and the line sources back exactly"
+
+# A directory that is not an identity gets no pin: beb's own "no .beb
+# here" is a better sentence about that nothing than a pin would make.
+: >"$ENVF"
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/bare" |
+    CLAUDE_ENV_FILE=$ENVF BEB_IDENTITY= "$PIN" >"$OUT" 2>"$ERR" || die "pin errored on a bare dir"
+test -s "$ENVF" && die "pinned a directory with no identity: $(cat "$ENVF")"
+ok "a directory that is not an identity is left unpinned"
+
+# An operator who launched with BEB_IDENTITY already said who they are.
+: >"$ENVF"
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/a" |
+    CLAUDE_ENV_FILE=$ENVF BEB_IDENTITY=/already/chosen "$PIN" >"$OUT" 2>"$ERR" || die "pin errored"
+test -s "$ENVF" && die "overrode an explicit BEB_IDENTITY: $(cat "$ENVF")"
+ok "an explicit BEB_IDENTITY is never overridden"
+
+# Builds that leave the variable empty must stay quiet, not fail.
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/a" |
+    env -u CLAUDE_ENV_FILE "$PIN" >"$OUT" 2>"$ERR" || die "no CLAUDE_ENV_FILE should exit 0"
+test -s "$OUT" && die "spoke on stdout with no env file: $(cat "$OUT")"
+ok "no CLAUDE_ENV_FILE: silent exit 0"
+
+# A path with a space has to survive being sourced.
+mkdir -p "$S/two words/.beb"
+: >"$ENVF"
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/two words" |
+    CLAUDE_ENV_FILE=$ENVF BEB_IDENTITY= "$PIN" >"$OUT" 2>"$ERR" || die "pin failed on a spaced path"
+( . "$ENVF"; [ "$BEB_IDENTITY" = "$S/two words" ] ) || die "spaced path mangled: $(cat "$ENVF")"
+ok "a path with spaces survives the round trip through sourcing"
 
 # ---- doorbell: edge semantics ------------------------------------------
 

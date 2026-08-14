@@ -47,6 +47,24 @@ per invocation, re-armed at each boundary).
    `.beb`, or `BEB_IDENTITY` in Claude Code's environment, which
    hooks inherit; the resolution is beb's, never claude-beb's. Where
    beb resolves nobody, every hook exits silently.
+7. The session is pinned to the directory it began in. An agent's
+   working directory is not a place it stays: it moves between
+   subdirectories, spawns shells, hands work to subagents, and each
+   move is a chance to sign as somebody else or as nobody, quietly,
+   in a tool whose subject is who signed. So SessionStart writes that
+   one directory to `CLAUDE_ENV_FILE`, and `cd` moves the shell
+   rather than the signer.
+
+   This does not make claude-beb the resolver, and 6 still holds: it
+   opens no key, reads no roster, and chooses between no candidates.
+   It records where the session started. beb decides who lives there,
+   and refuses if the answer is nobody or two. An operator who
+   launched with `BEB_IDENTITY` already said who they are, and the
+   pin never argues with them.
+
+   SessionStart alone. The same variable is offered on `CwdChanged`,
+   and writing it there would re-pin on every directory change, which
+   is the drift the pin exists to stop.
 
 ## Behavior
 

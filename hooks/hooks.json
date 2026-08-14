@@ -5,6 +5,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/beb-identity.sh",
+            "timeout": 5,
+            "statusMessage": "beb: pinning identity"
+          },
+          {
+            "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/beb-drain.sh",
             "timeout": 15,
             "statusMessage": "beb: checking mail"
