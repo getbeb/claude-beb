@@ -18,7 +18,7 @@ have=$("$BEB" --version 2>/dev/null | awk '{print $2}')
 case "$have" in
     "") echo "not ok - no beb on PATH or in BEB_BIN (\"$BEB\")"; exit 1 ;;
 esac
-gate=0.6.0
+gate=0.8.0
 older=$(printf '%s\n%s\n' "$gate" "$have" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)
 if [ "$have" != "$gate" ] && [ "$older" = "$have" ]; then
     echo "not ok - beb $have is older than $gate"
@@ -47,8 +47,8 @@ die() {
     exit 1
 }
 
-(cd "$S/a" && "$BEB" init >/dev/null 2>&1) || die "init a"
-(cd "$S/b" && "$BEB" init >/dev/null 2>&1) || die "init b"
+(cd "$S/a" && "$BEB" init a >/dev/null 2>&1) || die "init a"
+(cd "$S/b" && "$BEB" init b >/dev/null 2>&1) || die "init b"
 # beb 0.6.0 resolves BEB_IDENTITY and nothing else: no working
 # directory, no fallback. Every invocation below pins deliberately, the
 # way the pin hook does for a real session.

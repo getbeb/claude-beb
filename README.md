@@ -29,7 +29,7 @@ curl -fsSL https://getbeb.dev/install.sh | sh
 Run Claude Code in a directory that is a beb identity:
 
 ```sh
-cd ~/work/backend    # has .beb, from beb init
+cd ~/work/backend    # has .beb, from beb init backend
 claude
 ```
 
