@@ -21,10 +21,6 @@
 # change, which is the drift this exists to stop.
 set -u
 
-# No env file, nothing to write. Older builds are reported to leave it
-# empty, so absence is a quiet exit rather than an error.
-[ -n "${CLAUDE_ENV_FILE:-}" ] || exit 0
-
 # An operator who launched with BEB_IDENTITY already said who they are.
 # A hook that overrode that would be guessing over an explicit choice.
 [ -n "${BEB_IDENTITY:-}" ] && exit 0
@@ -35,6 +31,30 @@ set -u
 input=$(cat 2>/dev/null) || input=""
 dir=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
 [ -n "$dir" ] || dir=$(pwd)
+
+# What every failure here comes to, said once.
+#
+# SessionStart stdout is added to the session's context, so this reaches
+# the agent that is about to run beb commands, and it names the pin it
+# can put in front of them. Exit stays 0: a session that cannot be
+# pinned is still a session, and beb's own refusal is the backstop.
+unpinned() {
+    echo "[beb] this session is not pinned: $1"
+    echo "[beb] beb will refuse every command here until it is. Prefix each call with BEB_IDENTITY='$dir', or restart with: BEB_IDENTITY='$dir' claude"
+    exit 0
+}
+
+# No env file, nothing to write, and now nothing quiet about it.
+#
+# This used to exit 0 in silence, on the report that older builds leave
+# the variable empty. Claude Code 2.1.220 supplies it on every
+# SessionStart hook, and overrides an inherited one rather than passing
+# it through, so absence is no longer a build quirk to tolerate: it is
+# the pin not happening. A hook that announces "pinning identity" and
+# then returns 0 having pinned nothing is indistinguishable from one
+# that worked, which is how an unpinned session survived long enough to
+# need a `beb whoami` to find.
+[ -n "${CLAUDE_ENV_FILE:-}" ] || unpinned "Claude Code gave this hook no env file to write the pin to"
 
 # Pinned whether or not the directory is an identity yet. The guard used
 # to skip a bare directory, because beb resolved the working directory
@@ -47,6 +67,14 @@ dir=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\
 
 # Single-quote the value and escape any quote inside it, so a path with
 # spaces or punctuation survives being sourced.
+#
+# Truncating, not appending. The file is this hook's own -- Claude Code
+# hands each hook its own sessionstart-hook-<n>.sh -- and SessionStart
+# fires again on every resume with the same path, so appending wrote the
+# same export a second time, and a third. Sourcing stayed correct and the
+# file grew for the life of the session. One line is the whole state
+# this hook has.
 escaped=$(printf '%s' "$dir" | sed "s/'/'\\\\''/g")
-printf "export BEB_IDENTITY='%s'\n" "$escaped" >> "$CLAUDE_ENV_FILE" 2>/dev/null || exit 0
+printf "export BEB_IDENTITY='%s'\n" "$escaped" >"$CLAUDE_ENV_FILE" 2>/dev/null ||
+    unpinned "the env file at $CLAUDE_ENV_FILE could not be written"
 exit 0

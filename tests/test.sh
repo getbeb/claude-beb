@@ -126,6 +126,15 @@ grep -q "BEB_IDENTITY=" "$ENVF" || die "pin wrote nothing: [$(cat "$ENVF")]"
 ( . "$ENVF"; [ "$BEB_IDENTITY" = "$S/a" ] ) || die "pin value wrong: $(cat "$ENVF")"
 ok "SessionStart pins the launch directory, and the line sources back exactly"
 
+# SessionStart fires again on every resume, with the same env file. The
+# pin is one line of state, so a resume replaces it rather than stacking
+# another copy behind it.
+printf '{"hook_event_name":"SessionStart","source":"resume","cwd":"%s"}' "$S/a" |
+    CLAUDE_ENV_FILE=$ENVF BEB_IDENTITY= "$PIN" >"$OUT" 2>"$ERR" || die "pin failed on resume"
+[ "$(grep -c "BEB_IDENTITY=" "$ENVF")" = 1 ] || die "resume stacked pins: $(cat "$ENVF")"
+( . "$ENVF"; [ "$BEB_IDENTITY" = "$S/a" ] ) || die "resume pin wrong: $(cat "$ENVF")"
+ok "a resume rewrites the one pin instead of appending another"
+
 # A directory that is not an identity is pinned anyway. The guard used
 # to skip it, because beb resolved the working directory and its own
 # "no .beb here" was the better sentence. beb 0.6.0 reads nothing but
@@ -148,11 +157,30 @@ printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/a" |
 test -s "$ENVF" && die "overrode an explicit BEB_IDENTITY: $(cat "$ENVF")"
 ok "an explicit BEB_IDENTITY is never overridden"
 
-# Builds that leave the variable empty must stay quiet, not fail.
+# No env file is the pin not happening, and it says so. SessionStart
+# stdout is added to the session's context, so the sentence reaches the
+# agent that is about to run beb; exit stays 0 so it never interrupts.
 printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/a" |
     env -u CLAUDE_ENV_FILE "$PIN" >"$OUT" 2>"$ERR" || die "no CLAUDE_ENV_FILE should exit 0"
-test -s "$OUT" && die "spoke on stdout with no env file: $(cat "$OUT")"
-ok "no CLAUDE_ENV_FILE: silent exit 0"
+test -s "$OUT" || die "no env file and nothing said: the no-op is indistinguishable from the pin"
+grep -q "not pinned" "$OUT" || die "did not say the session is unpinned: $(cat "$OUT")"
+grep -q "BEB_IDENTITY='$S/a'" "$OUT" || die "did not name the pin to use: $(cat "$OUT")"
+ok "no CLAUDE_ENV_FILE: says the pin did not happen, and names the pin"
+
+# A write that fails is the same nothing, and gets the same sentence.
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/a" |
+    CLAUDE_ENV_FILE=$S/no/such/dir/envfile "$PIN" >"$OUT" 2>"$ERR" || die "unwritable env file should exit 0"
+grep -q "not pinned" "$OUT" || die "an unwritable env file passed in silence: $(cat "$OUT")"
+grep -q "BEB_IDENTITY='$S/a'" "$OUT" || die "did not name the pin to use: $(cat "$OUT")"
+ok "an unwritable env file is announced too, not swallowed"
+
+# The announcement is for the failure. A pin that happens stays quiet,
+# so a working boundary hands back no context at all.
+: >"$ENVF"
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/a" |
+    CLAUDE_ENV_FILE=$ENVF BEB_IDENTITY= "$PIN" >"$OUT" 2>"$ERR" || die "pin failed"
+test -s "$OUT" && die "spoke on a successful pin: $(cat "$OUT")"
+ok "a pin that happens says nothing"
 
 # A path with a space has to survive being sourced.
 mkdir -p "$S/two words/.beb"

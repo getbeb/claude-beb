@@ -201,3 +201,45 @@ so the interrupting path is reached only when a machine has neither --
 where interrupting still beats silence.
 
 Found by being asked what jq had to do with any of it.
+
+## A pin that does not happen says so (2026-08-17)
+
+`beb-identity.sh` exited 0 in silence when `CLAUDE_ENV_FILE` was empty,
+on the report that older builds leave it unset. That is the same shape
+as the two entries above: a hook that advertises "beb: pinning identity"
+and then returns 0 having pinned nothing is indistinguishable from one
+that worked, and the only way to find out is to run `beb whoami` and be
+refused.
+
+Measured against Claude Code 2.1.220 before changing anything, with a
+probe hook wired through `--settings` and a headless run per case:
+
+- `CLAUDE_ENV_FILE` is supplied to every `SessionStart` hook, as
+  `~/.claude/session-env/<session>/sessionstart-hook-<n>.sh`. A value
+  inherited from the launching shell is overridden, not passed through,
+  so a stale path cannot capture the pin.
+- It is not supplied on `Stop`, and the session environment loaded from
+  `SessionStart` does not reach a `Stop` hook either -- both were empty
+  there. The self-pin in the drain and the doorbell is load-bearing.
+- Nor does it reach a sibling `SessionStart` hook: pinning from
+  `sessionstart-hook-1` left `sessionstart-hook-2` with nothing. Hooks
+  in one event do not see each other's writes.
+- The pin does reach Bash. A fresh session in a directory with no
+  ambient `BEB_IDENTITY` had it set in the first tool call, and so did
+  the same session resumed: `SessionStart` fires again with
+  `source: resume` and the same env file path.
+- Because it fires again with the same path, appending wrote the export
+  a second time. Sourcing stayed correct and the file grew per resume.
+  The pin is one line of state, so it is written, not added to.
+- `SessionStart` stdout is added to the session's context, verified by
+  planting a token in a hook and asking for it back without tools.
+
+So absence is no longer a build quirk to tolerate -- it is the pin not
+happening, in a build that always offers one. Both silent paths, the
+missing env file and the failed write, now print two lines to stdout:
+that the session is unpinned, and the `BEB_IDENTITY=` prefix to put in
+front of beb calls or the launch to restart with. Exit stays 0, so it
+never interrupts, and a pin that works still says nothing.
+
+The suite asserted the silence, which is what let it stand. It now
+asserts the sentence, and separately that a successful pin is quiet.
