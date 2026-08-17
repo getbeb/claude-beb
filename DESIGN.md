@@ -184,3 +184,20 @@ hook re-arms it when the session is idle again.
 
 It was found by an agent noticing it had been interrupted by mail and
 asking whether that was supposed to happen.
+
+## Whether a hook interrupts is not the machine's to decide (0.8.1)
+
+The drain built its JSON with jq and, without jq, fell back to writing
+the announcement to stderr and exiting 2 -- which Claude surfaces as
+blocking feedback. So on a host with jq the same mail arrived as
+context, and on a host without it the session was interrupted. One
+machine in this fleet has no jq, and had been taking the second path at
+every boundary with mail standing.
+
+That is the doorbell's bug wearing different clothes, and worse for
+being environmental: nothing in the hook said which behaviour you would
+get. python3 now sits between the two, building the identical envelope,
+so the interrupting path is reached only when a machine has neither --
+where interrupting still beats silence.
+
+Found by being asked what jq had to do with any of it.

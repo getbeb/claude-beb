@@ -242,6 +242,30 @@ printf '%s' "$EV" | BEB_IDENTITY="$S/bare" "$BELL" >"$OUT" 2>"$ERR"
 test $? = 0 || die "doorbell errored without identity"
 ok "no identity: doorbell exits silently"
 
+# ---- the drain hands back context, whatever is installed ---------------
+#
+# With jq it emits additionalContext and exits 0. Without, the only other
+# path was exit 2, which Claude surfaces as blocking feedback -- so on a
+# machine with no jq every boundary with mail standing was an
+# interruption, which is the thing the doorbell was just taught not to
+# do. Whether a hook interrupts must not depend on which binaries a
+# machine happens to carry.
+sed 's/command -v jq/command -v definitely-not-jq/' "$DRAIN" > "$S/drain-nojq.sh"
+chmod +x "$S/drain-nojq.sh"
+printf '%s' "$EV" | BEB_IDENTITY="$S/a" "$DRAIN" >"$S/jq.json" 2>/dev/null
+rc_jq=$?
+printf '%s' "$EV" | BEB_IDENTITY="$S/a" "$S/drain-nojq.sh" >"$S/py.json" 2>/dev/null
+rc_py=$?
+test "$rc_jq" = 0 || die "the drain exited $rc_jq with jq"
+test "$rc_py" = 0 || die "the drain exited $rc_py without jq; it interrupts"
+python3 -c "
+import json,sys
+a=json.load(open('$S/jq.json')); b=json.load(open('$S/py.json'))
+assert a==b, (a,b)
+assert 'mail waits' in a['hookSpecificOutput']['additionalContext']
+" || die "the two paths do not produce the same envelope"
+ok "the drain hands back the same context with jq or with python3, and interrupts with neither"
+
 # ---- a working session is not interrupted ------------------------------
 #
 # The doorbell is armed at a boundary and keeps waiting through the next

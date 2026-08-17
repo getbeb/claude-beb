@@ -61,9 +61,21 @@ if command -v jq >/dev/null 2>&1; then
       additionalContext: .
     }
   }'
+elif command -v python3 >/dev/null 2>&1; then
+    # Same JSON, same guarantee, from a different interpreter. Whether
+    # this hook interrupts must not depend on which binaries a machine
+    # happens to carry: with jq it hands back context and exits 0, and
+    # without it the only other path was exit 2, which Claude surfaces
+    # as blocking feedback. One host in this fleet has no jq, so its
+    # every boundary with mail standing was an interruption -- the exact
+    # thing the doorbell was just taught not to do.
+    printf '%s' "$msg" | python3 -c 'import json, sys
+print(json.dumps({"hookSpecificOutput": {"hookEventName": sys.argv[1],
+                                         "additionalContext": sys.stdin.read()}}))' "$event"
 else
-    # No jq: exit-2 stderr is surfaced by Claude as feedback. Loses
-    # structure but never mangles JSON.
+    # Neither: exit-2 stderr is surfaced by Claude as feedback. It
+    # interrupts, which is worse than context and better than silence,
+    # and it never mangles JSON because it builds none.
     printf '%s\n' "$msg" >&2
     exit 2
 fi
