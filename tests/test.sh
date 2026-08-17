@@ -18,7 +18,7 @@ have=$("$BEB" --version 2>/dev/null | awk '{print $2}')
 case "$have" in
     "") echo "not ok - no beb on PATH or in BEB_BIN (\"$BEB\")"; exit 1 ;;
 esac
-gate=0.9.0
+gate=0.10.0
 older=$(printf '%s\n%s\n' "$gate" "$have" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)
 if [ "$have" != "$gate" ] && [ "$older" = "$have" ]; then
     echo "not ok - beb $have is older than $gate"
@@ -100,13 +100,14 @@ python3 -c "
 import json
 c=json.load(open('$OUT'))['hookSpecificOutput']['additionalContext']
 first=c.splitlines()[0]
-# beb 0.9.0 dropped the counts from this header -- 'N total, M unread'
-# cost a full directory read on every listing. What has to survive is
-# that a paged listing says so: this hook carries one line of what beb
-# says, so 'more waiting' has to be in that line and not only in the
-# paging hint below it.
+# What has to survive is that a paged listing says so: this hook carries
+# one line of what beb says, so the fact that more is waiting has to be
+# in that line and not only in the paging hint below it. beb 0.10.0
+# spells it ', more' -- ', more waiting' claimed unread mail even when
+# paging through mail already read, which a fully-read mailbox answered
+# two different ways in consecutive commands.
 assert 'showing' in first, first
-assert 'more waiting' in first, first
+assert ', more' in first, first
 rows=[l for l in c.splitlines() if l.strip()[:1].isdigit()]
 assert len(rows)==10, len(rows)
 " || die "drain did not carry the paging summary: $(cat "$OUT")"

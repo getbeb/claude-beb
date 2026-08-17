@@ -99,7 +99,7 @@ while :; do
             # them, is wired to Stop, so its answer lands at the *end* of
             # the turn the wake just started. By then the session has
             # read the mail. The interrupt should say what it is about.
-            out=$("$BEB" list 2>&1) || exit 0
+            out=$("$BEB" list --unread --limit 10 2>&1) || exit 0
             unread=$(printf '%s\n' "$out" | grep -v '^beb:')
             if [ -n "$unread" ]; then
                 [ -n "$sid" ] && rm -f "$own"

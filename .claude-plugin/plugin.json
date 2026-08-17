@@ -1,6 +1,6 @@
 {
   "name": "claude-beb",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Event-driven beb mail for Claude Code: wake on arrival when idle, deliver at the turn boundary when busy",
   "author": {
     "name": "Yanuar Aristya Edy Putra"

@@ -43,7 +43,7 @@ fi
 # stdout would hand back ten rows of twenty-five and call it the mail.
 # Every line beb writes to stderr begins `beb: `, so one capture splits
 # cleanly into the artifact and what is said about it.
-out=$("$BEB" list 2>&1) || exit 0
+out=$("$BEB" list --unread --limit 10 2>&1) || exit 0
 unread=$(printf '%s\n' "$out" | grep -v '^beb:')
 [ -n "$unread" ] || exit 0
 summary=$(printf '%s\n' "$out" | sed -n 's/^beb: //p' | head -n 1)
