@@ -122,3 +122,23 @@ Every proposed feature answers one question:
 
 > Is this necessary to wake Claude Code when mail arrives for the
 > identity it is running as?
+
+## The pin reaches Bash, not hooks (2026-08-17)
+
+`beb-identity.sh` writes `BEB_IDENTITY` to `CLAUDE_ENV_FILE`, which
+Claude Code sources before every Bash command. It does not source it
+before a hook. So on a machine whose environment does not already carry
+`BEB_IDENTITY`, `beb-drain.sh` and `beb-doorbell.sh` both asked beb who
+they were, got a refusal, and exited 0 in silence -- no announcement at
+a turn boundary, and no doorbell armed at all.
+
+It stayed hidden because the agent's own `beb` calls worked throughout:
+those are Bash commands, and Bash commands do get the env file. Mail
+arrived and nothing said so. It was found on a second machine three days
+after that machine's last doorbell, and never on the first, whose shell
+exports `BEB_IDENTITY` and so passed it to every hook by inheritance.
+
+Both hooks now read the launch directory out of the hook input they were
+already parsing, and pin themselves when nothing else has. The suite
+handed every hook an explicit `BEB_IDENTITY` before this, which is what
+made the gap invisible to it too.

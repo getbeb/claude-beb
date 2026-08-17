@@ -27,10 +27,30 @@
 set -u
 BEB="${BEB_BIN:-beb}"
 
+# Read once: the session id and the launch directory are both in it.
+input=$(cat 2>/dev/null) || input=""
+sid=$(printf '%s' "$input" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+
+# The pin, when the environment carries none.
+#
+# beb-identity.sh writes BEB_IDENTITY to CLAUDE_ENV_FILE, which Claude
+# Code sources before every Bash command -- and not before a hook. So on
+# a machine that does not already export BEB_IDENTITY in the environment
+# Claude Code was launched from, every hook here saw no identity, beb
+# refused, and each exited 0 saying nothing. The agent's own `beb` calls
+# worked the whole time, which is what made it invisible: mail arrived,
+# nothing announced it, and nothing had failed.
+#
+# The launch directory is in the same hook input already being read, so
+# it is read from there rather than guessed from a working directory a
+# hook does not control.
+if [ -z "${BEB_IDENTITY:-}" ]; then
+    dir=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+    [ -n "$dir" ] && export BEB_IDENTITY="$dir"
+fi
+
 # Same identity gate as everywhere: beb answers, we don't guess.
 "$BEB" whoami >/dev/null 2>&1 || exit 0
-
-sid=$(sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' 2>/dev/null | head -n 1)
 den="${TMPDIR:-/tmp}/claude-beb-doorbells.$(id -u)"
 own="$den/$sid"
 token="$$.$(od -An -N4 -tx4 /dev/urandom 2>/dev/null | tr -d ' \t')"

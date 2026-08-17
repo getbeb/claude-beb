@@ -20,6 +20,24 @@ input=$(cat)
 event=$(printf '%s' "$input" | sed -n 's/.*"hook_event_name"[[:space:]]*:[[:space:]]*"\([A-Za-z]*\)".*/\1/p')
 [ -n "$event" ] || event="Stop"
 
+# The pin, when the environment carries none.
+#
+# beb-identity.sh writes BEB_IDENTITY to CLAUDE_ENV_FILE, which Claude
+# Code sources before every Bash command -- and not before a hook. So on
+# a machine that does not already export BEB_IDENTITY in the environment
+# Claude Code was launched from, every hook here saw no identity, beb
+# refused, and each exited 0 saying nothing. The agent's own `beb` calls
+# worked the whole time, which is what made it invisible: mail arrived,
+# nothing announced it, and nothing had failed.
+#
+# The launch directory is in the same hook input already being read, so
+# it is read from there rather than guessed from a working directory a
+# hook does not control.
+if [ -z "${BEB_IDENTITY:-}" ]; then
+    dir=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+    [ -n "$dir" ] && export BEB_IDENTITY="$dir"
+fi
+
 # `beb list` pages: the rows are stdout, and how much was NOT shown is
 # on stderr with every other line beb says about them. Taking only
 # stdout would hand back ten rows of twenty-five and call it the mail.

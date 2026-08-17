@@ -231,4 +231,29 @@ printf '%s' "$EV" | BEB_IDENTITY="$S/bare" "$BELL" >"$OUT" 2>"$ERR"
 test $? = 0 || die "doorbell errored without identity"
 ok "no identity: doorbell exits silently"
 
+# ---- hooks pin themselves from the hook input --------------------------
+#
+# Every test above hands the hook a BEB_IDENTITY, which is how this was
+# missed: beb-identity.sh writes the pin to CLAUDE_ENV_FILE, and Claude
+# Code sources that for Bash commands, not for hooks. On a machine whose
+# environment does not already carry BEB_IDENTITY, every hook here saw no
+# identity and exited 0 in silence, for three days, while the agent's own
+# beb calls worked the whole time.
+EVC='{"hook_event_name":"SessionStart","session_id":"pin-session","cwd":"'"$S/a"'"}'
+
+printf '%s' "$EVC" | env -u BEB_IDENTITY CLAUDE_BEB_WAIT_SECS=30 "$BELL" >"$OUT" 2>"$ERR" &
+BP=$!
+sleep 3
+as b send "$A" --subject "pinned ding" --body "pinned ding" >/dev/null 2>&1 || die "send pinned ding"
+wait $BP; rc=$?
+test "$rc" = 2 || die "an unpinned doorbell exited $rc; it never armed from the input cwd"
+ok "the doorbell pins itself from the hook input, so it arms with nothing in the environment"
+
+printf '%s' "$EVC" | env -u BEB_IDENTITY "$DRAIN" >"$OUT" 2>"$ERR"
+# Any announcement will do: the mailbox holds more than one page by now,
+# so naming a subject would be asserting which page it is on.
+grep -q 'mail waits' "$OUT" "$ERR" 2>/dev/null ||
+    die "an unpinned drain announced nothing: $(cat "$OUT" "$ERR" 2>/dev/null | head -3)"
+ok "and so does the drain, which is what announces mail at a turn boundary"
+
 echo "all $n tests passed"
