@@ -194,7 +194,17 @@ rc=$?
 t1=$(date +%s)
 test "$rc" = 2 || die "doorbell did not exit 2 on arrival (rc=$rc)"
 test $((t1 - t0)) -lt 8 || die "doorbell took $((t1 - t0))s"
-grep -q "read it with: beb read" "$ERR" || die "wake line: $(cat "$ERR")"
+# The wake carries the mail, not a sentence about it. A doorbell that
+# only says "mail is waiting" makes the session spend a turn asking who
+# it was from, and the drain that would answer runs at the *end* of that
+# turn, by which time it has been read.
+grep -q "read with: beb read" "$ERR" || die "wake line: $(cat "$ERR")"
+grep -q "mail waits:" "$ERR" || die "the wake carries no summary: $(cat "$ERR")"
+# A row, which is id / age / subject / sender. Not a particular subject:
+# ten already stand unread here, so beb pages and the newest is not on
+# the page -- which is beb's answer and the drain's behaviour too.
+grep -qE '^[[:space:]]*[0-9]+[[:space:]]+[^[:space:]]+[[:space:]]+.*[[:space:]]b$' "$ERR" ||
+    die "the wake carries no rows, only a sentence: $(cat "$ERR")"
 ok "arrival: doorbell exits 2 fast, names the verb"
 
 # ---- doorbell: supersession --------------------------------------------

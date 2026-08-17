@@ -142,3 +142,22 @@ Both hooks now read the launch directory out of the hook input they were
 already parsing, and pin themselves when nothing else has. The suite
 handed every hook an explicit `BEB_IDENTITY` before this, which is what
 made the gap invisible to it too.
+
+## The wake carries the mail (0.6.0)
+
+The doorbell used to write one sentence -- "beb mail is waiting" -- and
+leave the rows to `beb-drain.sh`. But drain is wired to `Stop`, and the
+doorbell's exit 2 *starts* a turn, so the rows landed at the end of the
+turn the wake had begun, by which time the session had already run `beb
+read` to find out what it was. The interruption was paid and the answer
+came late.
+
+So the doorbell now announces what drain announces: the summary, the
+rows, and `read with: beb read`. `beb list` serves as both halves of the
+arrival check, since no rows means another reader took it and there is
+nothing to say. pi-beb resolved this the same way and has only ever had
+one announcer.
+
+drain stays exactly as it was. It repeats at every boundary until the
+mail is actually read, which is what covers a session that started with
+mail already standing, and is the behaviour a wake cannot provide.

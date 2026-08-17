@@ -87,11 +87,25 @@ while :; do
     # elapsed, anything else a refusal (no mailbox, no identity, no beb).
     case $rc in
         0)
-            # Still unread? Mail taken by another integration between the
-            # wait returning and this check is silence, not a stale wake.
-            if "$BEB" wait --timeout 0 >/dev/null 2>&1; then
+            # The list is both halves of this: whether there is still
+            # anything to say, and what to say. Mail taken by another
+            # integration between the wait returning and this call leaves
+            # no rows, and no rows is silence rather than a stale wake.
+            #
+            # It carries the rows because the alternative was a sentence.
+            # A doorbell that says only "mail is waiting" has already paid
+            # the interruption and then makes the session spend a turn
+            # asking who it was from -- and the drain, which does carry
+            # them, is wired to Stop, so its answer lands at the *end* of
+            # the turn the wake just started. By then the session has
+            # read the mail. The interrupt should say what it is about.
+            out=$("$BEB" list 2>&1) || exit 0
+            unread=$(printf '%s\n' "$out" | grep -v '^beb:')
+            if [ -n "$unread" ]; then
                 [ -n "$sid" ] && rm -f "$own"
-                echo "beb mail is waiting; read it with: beb read" >&2
+                summary=$(printf '%s\n' "$out" | sed -n 's/^beb: //p' | head -n 1)
+                printf '[beb] mail waits: %s\n%s\nread with: beb read\n' \
+                    "$summary" "$unread" >&2
                 exit 2
             fi
             ;;
