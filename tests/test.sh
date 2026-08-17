@@ -242,6 +242,38 @@ printf '%s' "$EV" | BEB_IDENTITY="$S/bare" "$BELL" >"$OUT" 2>"$ERR"
 test $? = 0 || die "doorbell errored without identity"
 ok "no identity: doorbell exits silently"
 
+# ---- a working session is not interrupted ------------------------------
+#
+# The doorbell is armed at a boundary and keeps waiting through the next
+# turn, so mail landing mid-work rang it -- and its wake is an exit 2,
+# which interrupts. Mail waits; it is never pushed. A turn beginning
+# takes the doorbell's ownership, and the drain announces at the next
+# boundary instead.
+HUSH=$HERE/hooks/beb-hush.sh
+EVH='{"hook_event_name":"UserPromptSubmit","session_id":"hush-session","cwd":"'"$S/a"'"}'
+EVD='{"hook_event_name":"Stop","session_id":"hush-session","cwd":"'"$S/a"'"}'
+
+printf '%s' "$EVD" | BEB_IDENTITY="$S/a" CLAUDE_BEB_WAIT_SECS=30 "$BELL" >"$OUT" 2>"$ERR" &
+HP=$!
+sleep 3                                   # armed and parked
+printf '%s' "$EVH" | "$HUSH" >/dev/null 2>&1 || die "hush errored"
+as b send "$A" --subject "mid-turn" --body "mid-turn" >/dev/null 2>&1 || die "send mid-turn"
+wait $HP; rc=$?
+test "$rc" = 0 || die "a hushed doorbell exited $rc; it interrupted a working session"
+test ! -s "$ERR" || die "a hushed doorbell still spoke: $(cat "$ERR")"
+ok "mail landing mid-turn does not ring a doorbell the session has hushed"
+
+# And with no hush it still wakes, or the hush would be indistinguishable
+# from a doorbell that never worked.
+printf '%s' "$EVD" | BEB_IDENTITY="$S/a" CLAUDE_BEB_WAIT_SECS=30 "$BELL" >"$OUT" 2>"$ERR" &
+HP2=$!
+sleep 3
+as b send "$A" --subject "idle ding" --body "idle ding" >/dev/null 2>&1 || die "send idle ding"
+wait $HP2; rc=$?
+test "$rc" = 2 || die "an idle doorbell exited $rc, wanted 2"
+grep -q 'mail waits' "$ERR" || die "an idle doorbell said nothing: $(cat "$ERR")"
+ok "and an idle session is still woken, which is what a doorbell is for"
+
 # ---- hooks pin themselves from the hook input --------------------------
 #
 # Every test above hands the hook a BEB_IDENTITY, which is how this was

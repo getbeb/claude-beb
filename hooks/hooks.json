@@ -45,6 +45,18 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/beb-hush.sh",
+            "timeout": 5,
+            "statusMessage": "beb: standing the doorbell down"
+          }
+        ]
+      }
     ]
   }
 }

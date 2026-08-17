@@ -161,3 +161,26 @@ one announcer.
 drain stays exactly as it was. It repeats at every boundary until the
 mail is actually read, which is what covers a session that started with
 mail already standing, and is the behaviour a wake cannot provide.
+
+## A working session is not interrupted (0.8.0)
+
+The doorbell is armed at a turn boundary and waits from there, so it was
+still waiting during the next turn. Mail landing mid-work rang it, and
+its wake is an exit 2 -- the session was interrupted and made to handle
+mail it had not asked for, halfway through something else.
+
+That is backwards for this tool. Mail waits and is never pushed, because
+a context switch costs an agent what it costs a person; the doorbell
+exists for a session with nothing to do, not for one in the middle of
+something.
+
+So a turn beginning takes the doorbell's ownership. `UserPromptSubmit`
+removes the session's token, which is already the thing that decides
+whether a woken doorbell may speak -- the check sits between the wait
+returning and the announcement, so one removed file turns a wake into a
+silent exit. Nothing is lost: the drain announces at the next boundary,
+which is where an interruption belonged in the first place. The Stop
+hook re-arms it when the session is idle again.
+
+It was found by an agent noticing it had been interrupted by mail and
+asking whether that was supposed to happen.
