@@ -57,8 +57,11 @@ correspondents with beb's own verbs; claude-beb adds no verbs and no
 tools, and it never consumes mail: the cursor moves only when the
 agent runs `beb read` itself.
 
-If `beb whoami` cannot resolve an identity, every hook exits
-silently.
+If `beb whoami` cannot resolve an identity, the drain and the doorbell
+exit silently: a session with no mailbox to watch stays quiet. The pin
+hook is the exception. When it cannot pin at all it says so, and names
+the pin to use, because a hook that reports success having done
+nothing looks exactly like one that worked.
 
 For interactive use, running claude from the identity directory is
 enough: the pin hook records it at SessionStart, and beb reads only
@@ -66,9 +69,21 @@ the pin. For long-lived agent sessions that change working directory,
 set `BEB_IDENTITY` when starting claude: it pins identity to the
 process tree, which hooks inherit, while the cwd wanders freely.
 
+The pin belongs to the session that recorded it. If beb refuses in a
+session that has been running for a while, that session started
+without one, and resuming it may not add one. Starting a new session
+in the identity directory does, and launching with `BEB_IDENTITY` set
+works either way.
+
 ## How it works
 
-Two hook scripts, both armed on SessionStart and Stop:
+Four hook scripts divide the lifecycle:
+
+- `beb-identity.sh` pins the session's identity at SessionStart.
+- `beb-hush.sh` stands an armed doorbell down at UserPromptSubmit,
+  so a turn that has already begun is never interrupted by one.
+
+The other two are armed at SessionStart and again at Stop:
 
 - `beb-drain.sh` (synchronous) asks `beb list` and hands unread mail
   back as `additionalContext`. Empty list, silent exit. It repeats
