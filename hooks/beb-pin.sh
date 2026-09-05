@@ -37,3 +37,30 @@ beb_pin() {   # $1 the hook input JSON, $2 the project dir if there is one
     esac
 }
 
+# Who the pin makes this session, said the way a reader says it.
+#
+# The announcement exists so a session that could be either role knows
+# which one it is speaking for, and a path is a poor answer to that: two
+# coders under one checkout differ by a trailing word, and the reader
+# already chose a better name for each. So the roster name, and the pin
+# only when nobody has named this identity here -- where a path is the
+# one thing that still distinguishes it, and is what a wrong pin needs
+# shown anyway.
+#
+# Both halves are artifacts on stdout, not prose: `whoami` prints the
+# address, `contacts` prints the roster in the file's own format, and
+# the address is exactly its second and third fields. Nothing here reads
+# a sentence beb wrote, which is the rule that lets beb reword them.
+beb_who() {
+    _b=${BEB_BIN:-beb}
+    _addr=$("$_b" whoami 2>/dev/null) || _addr=""
+    if [ -n "$_addr" ]; then
+        _name=$("$_b" contacts 2>/dev/null |
+            awk -v k="$_addr" '$2" "$3==k { print $1; exit }')
+        if [ -n "$_name" ]; then
+            printf '%s' "$_name"
+            return 0
+        fi
+    fi
+    printf '%s' "${BEB_IDENTITY:-}"
+}

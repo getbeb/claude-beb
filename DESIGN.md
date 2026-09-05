@@ -98,10 +98,19 @@ of twenty-five handed back without the count would read as all of the
 mail. Unread mail becomes
 additional context in the same shape at either boundary:
 
-    [beb] mail waits:
+    [beb] mail waits for backend:
     3  frontend
     4  ssh-ed25519 AAAA...
     read with: beb read
+
+The line names the identity it speaks for: a session is whichever
+role its `BEB_IDENTITY` says, and an announcement that omits it reads
+the same in the advisor's session and the coder's. It says the roster
+name, because that is the name the reader chose and two coders under
+one checkout differ by a trailing path segment. An identity nobody has
+named here falls back to the pin, which is then the only thing that
+tells it apart, and is what a pin pointing somewhere wrong needs
+shown.
 
 An empty list is a silent exit; a quiet boundary stays quiet. The
 announcement repeats at each boundary until the agent reads, because

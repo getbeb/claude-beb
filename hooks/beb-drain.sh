@@ -39,7 +39,7 @@ summary=$(printf '%s\n' "$out" | sed -n 's/^beb: //p' | head -n 1)
 # BEB_IDENTITY says, and one that can be either reads an unnamed
 # announcement the same way in both: an agent directing three coders
 # caught a wrong-role assumption after acting on it, not before.
-msg="[beb] mail waits: $summary
+msg="[beb] mail waits for $(beb_who): $summary
 $unread
 read with: beb read"
 

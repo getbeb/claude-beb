@@ -49,12 +49,17 @@ die() {
 
 (cd "$S/a" && "$BEB" init a >/dev/null 2>&1) || die "init a"
 (cd "$S/b" && "$BEB" init b >/dev/null 2>&1) || die "init b"
+mkdir -p "$S/anon" && { (cd "$S/anon" && "$BEB" init anon >/dev/null 2>&1) || die "init anon"; }
 # beb 0.6.0 resolves BEB_IDENTITY and nothing else: no working
 # directory, no fallback. Every invocation below pins deliberately, the
 # way the pin hook does for a real session.
 as() { d=$1; shift; BEB_IDENTITY="$S/$d" "$BEB" "$@"; }
 A=$(as a whoami 2>/dev/null)
-echo "b $(as b whoami 2>/dev/null)" >"$S/config/beb/known_signers"
+# Both names, because the announcement says the roster name and the
+# fallback needs an identity that has none: `anon` below is inited and
+# then left out of this file deliberately.
+{ echo "a $(as a whoami 2>/dev/null)"; echo "b $(as b whoami 2>/dev/null)"; } \
+    >"$S/config/beb/known_signers"
 
 EV='{"hook_event_name":"SessionStart","session_id":"test-session"}'
 
@@ -77,11 +82,11 @@ d=json.load(open('$OUT'))
 o=d['hookSpecificOutput']
 assert o['hookEventName']=='SessionStart', o
 c=o['additionalContext']
-assert c.startswith('[beb] mail waits:'), c
+assert c.startswith('[beb] mail waits for a:'), c
 assert 'read with: beb read' in c, c
 assert '1  ' in c, c
 " || die "drain output shape: $(cat "$OUT")"
-ok "mail waiting: drain announces list as additionalContext"
+ok "mail waiting: drain announces list as additionalContext, naming the pin it speaks for"
 
 printf '%s' "$EV" | BEB_IDENTITY="$S/a" "$DRAIN" >"$S/out2.txt" 2>"$ERR" || die "drain rerun failed"
 cmp -s "$OUT" "$S/out2.txt" || die "drain is not idempotent"
@@ -238,6 +243,15 @@ grep -q 'mail waits' "$OUT" ||
     die "the drain said nothing for a relative pin from a worktree: $(cat "$OUT" "$ERR")"
 ok "the drain announces for a relative pin from a worktree, which is the case that reported silence"
 
+# The name is the reader's, so an identity nobody has named here has
+# none to show. The pin is what still tells it apart, and what a pin
+# pointing somewhere wrong needs shown.
+as b send "$(as anon whoami 2>/dev/null)" --subject "for anon" --body "for anon" >/dev/null 2>&1 ||
+    die "send to anon"
+printf '%s' "$EV" | BEB_IDENTITY="$S/anon" "$DRAIN" >"$OUT" 2>"$ERR" || die "drain for anon"
+grep -q "mail waits for $S/anon:" "$OUT" ||
+    die "an unnamed identity did not fall back to its pin: $(cat "$OUT")"
+ok "an identity nobody has named here is announced by its pin instead"
 
 # ---- doorbell: edge semantics ------------------------------------------
 
@@ -277,7 +291,7 @@ test $((t1 - t0)) -lt 8 || die "doorbell took $((t1 - t0))s"
 # it was from, and the drain that would answer runs at the *end* of that
 # turn, by which time it has been read.
 grep -q "read with: beb read" "$ERR" || die "wake line: $(cat "$ERR")"
-grep -q "mail waits:" "$ERR" || die "the wake carries no summary: $(cat "$ERR")"
+grep -q "mail waits for " "$ERR" || die "the wake carries no summary: $(cat "$ERR")"
 # A row, which is id / age / subject / sender. Not a particular subject:
 # ten already stand unread here, so beb pages and the newest is not on
 # the page -- which is beb's answer and the drain's behaviour too.
@@ -399,8 +413,8 @@ ok "the doorbell pins itself from the hook input, so it arms with nothing in the
 printf '%s' "$EVC" | env -u BEB_IDENTITY "$DRAIN" >"$OUT" 2>"$ERR"
 # Any announcement will do: the mailbox holds more than one page by now,
 # so naming a subject would be asserting which page it is on.
-grep -q 'mail waits' "$OUT" "$ERR" 2>/dev/null ||
-    die "an unpinned drain announced nothing: $(cat "$OUT" "$ERR" 2>/dev/null | head -3)"
+grep -q "mail waits for a:" "$OUT" "$ERR" 2>/dev/null ||
+    die "an unpinned drain announced nothing, or not for the identity it pinned: $(cat "$OUT" "$ERR" 2>/dev/null | head -3)"
 ok "and so does the drain, which is what announces mail at a turn boundary"
 
 echo "all $n tests passed"

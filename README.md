@@ -49,7 +49,7 @@ in, and announced if that resolves to no identity.
 Unread mail is announced as context:
 
 ```text
-[beb] mail waits: showing 2; cursor at 2; read next is 3
+[beb] mail waits for backend: showing 2; cursor at 2; read next is 3
 4  12m  schema question  ssh-ed25519 AAAA...
 3  4h   deploy blocked   frontend
 read with: beb read

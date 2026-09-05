@@ -91,8 +91,8 @@ while :; do
             if [ -n "$unread" ]; then
                 [ -n "$sid" ] && rm -f "$own"
                 summary=$(printf '%s\n' "$out" | sed -n 's/^beb: //p' | head -n 1)
-                printf '[beb] mail waits: %s\n%s\nread with: beb read\n' \
-                    "$summary" "$unread" >&2
+                printf '[beb] mail waits for %s: %s\n%s\nread with: beb read\n' \
+                    "$(beb_who)" "$summary" "$unread" >&2
                 exit 2
             fi
             ;;
