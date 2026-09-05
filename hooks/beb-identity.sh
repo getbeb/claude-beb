@@ -21,16 +21,37 @@
 # change, which is the drift this exists to stop.
 set -u
 
-# An operator who launched with BEB_IDENTITY already said who they are.
-# A hook that overrode that would be guessing over an explicit choice.
-[ -n "${BEB_IDENTITY:-}" ] && exit 0
+# The project directory, passed from hooks.json because it is a command
+# substitution rather than a variable in the environment. It names where
+# the session started and stays there when Claude enters a worktree.
+proj=${1:-}
 
 # The session's own directory, from the hook input, falling back to the
 # process's. Reading it from the JSON matters: the launch directory is
 # what the session is, and it is not always where this hook is run.
 input=$(cat 2>/dev/null) || input=""
-dir=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
-[ -n "$dir" ] || dir=$(pwd)
+cwd=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+[ -n "$cwd" ] || cwd=$(pwd)
+
+# An operator who launched with an absolute BEB_IDENTITY already said who
+# they are, and a hook that overrode that would be guessing over an
+# explicit choice.
+#
+# A relative one cannot be left alone the same way. beb refuses it, since
+# it names a different directory from every cwd, so the session would
+# have no identity at all -- and the refusal is swallowed by every hook
+# here, each of which reads one as "nothing to do in this directory".
+# It is resolved against where the session started, which is what a
+# relative pin was written against; Claude's cwd has already followed it
+# into the worktree where the identity is not.
+explicit=0
+case "${BEB_IDENTITY:-}" in
+    "")  dir=$cwd ;;
+    /*)  exit 0 ;;
+    *)   explicit=1
+         base=${proj:-$cwd}
+         dir="$base/$BEB_IDENTITY" ;;
+esac
 
 # What every failure here comes to, said once.
 #
@@ -77,4 +98,14 @@ unpinned() {
 escaped=$(printf '%s' "$dir" | sed "s/'/'\\\\''/g")
 printf "export BEB_IDENTITY='%s'\n" "$escaped" >"$CLAUDE_ENV_FILE" 2>/dev/null ||
     unpinned "the env file at $CLAUDE_ENV_FILE could not be written"
+
+# A pin the caller chose and beb cannot use is the one failure here that
+# has to be loud. Everywhere else silence is right: a session in a
+# directory that is not an identity should say nothing at all. But
+# somebody who set BEB_IDENTITY meant to be somebody, and otherwise the
+# way they find out they are not is a mailbox quietly filling up.
+if [ "$explicit" = 1 ] && ! BEB_IDENTITY="$dir" "${BEB_BIN:-beb}" whoami >/dev/null 2>&1; then
+    echo "[beb] BEB_IDENTITY was relative and does not resolve to an identity: $dir"
+    echo "[beb] relaunch with an absolute pin: BEB_IDENTITY=/path/to/identity claude"
+fi
 exit 0

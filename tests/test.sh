@@ -190,6 +190,55 @@ printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/two words" |
 ( . "$ENVF"; [ "$BEB_IDENTITY" = "$S/two words" ] ) || die "spaced path mangled: $(cat "$ENVF")"
 ok "a path with spaces survives the round trip through sourcing"
 
+# ---- identity: a relative pin ------------------------------------------
+#
+# beb refuses a relative pin: it names a different directory from every
+# cwd. Claude's cwd follows it into a git worktree, where the identity is
+# not, so a coder launched with BEB_IDENTITY=.agents/coder2 resolved to
+# nothing -- and every hook read that refusal as "no identity here" and
+# said nothing, for ten minutes, while its mail stood unread.
+#
+# The base is where the session started, which hooks.json passes in.
+mkdir -p "$S/wt"
+: >"$ENVF"
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/wt" |
+    CLAUDE_ENV_FILE=$ENVF BEB_IDENTITY=a "$PIN" "$S" >"$OUT" 2>"$ERR" ||
+    die "pin failed on a relative BEB_IDENTITY"
+( . "$ENVF"; [ "$BEB_IDENTITY" = "$S/a" ] ) ||
+    die "a relative pin was not resolved against the project dir: $(cat "$ENVF")"
+test -s "$OUT" && die "a relative pin that resolves still spoke: $(cat "$OUT")"
+ok "a relative pin resolves against where the session started, not the worktree it is in"
+
+# Without a project dir there is only the cwd, which is the best a hook
+# can do and is what the pin meant before Claude moved.
+: >"$ENVF"
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S" |
+    CLAUDE_ENV_FILE=$ENVF BEB_IDENTITY=a "$PIN" "" >"$OUT" 2>"$ERR" || die "pin failed with no project dir"
+( . "$ENVF"; [ "$BEB_IDENTITY" = "$S/a" ] ) || die "no project dir: $(cat "$ENVF")"
+ok "and against the session cwd when the harness passes no project dir"
+
+# The one failure that must be loud. Silence is right for a directory
+# that is not an identity; somebody who set BEB_IDENTITY meant to be
+# somebody, and otherwise finds out by way of a mailbox filling up.
+: >"$ENVF"
+printf '{"hook_event_name":"SessionStart","cwd":"%s"}' "$S/wt" |
+    CLAUDE_ENV_FILE=$ENVF BEB_IDENTITY=nosuch "$PIN" "$S" >"$OUT" 2>"$ERR" ||
+    die "pin errored on an unresolvable relative pin"
+grep -q "does not resolve to an identity" "$OUT" ||
+    die "an explicit pin that resolves to nothing passed in silence: $(cat "$OUT")"
+grep -q "absolute pin" "$OUT" || die "it does not name the fix: $(cat "$OUT")"
+ok "an explicit relative pin that resolves to nothing says so, and names the fix"
+
+# The whole point, end to end: the drain announces for a session whose
+# pin is relative and whose cwd is a worktree. This is the case that
+# reported home as "the doorbell did not fire".
+printf '{"hook_event_name":"Stop","cwd":"%s"}' "$S/wt" |
+    BEB_IDENTITY=a "$DRAIN" "$S" >"$OUT" 2>"$ERR" || die "drain failed on a relative pin"
+grep -q 'mail waits' "$OUT" ||
+    die "the drain said nothing for a relative pin from a worktree: $(cat "$OUT" "$ERR")"
+ok "the drain announces for a relative pin from a worktree, which is the case that reported silence"
+
+
 # ---- doorbell: edge semantics ------------------------------------------
 
 # Mail stands unread; an edge-triggered doorbell must NOT wake for it.
@@ -280,6 +329,9 @@ ok "no identity: doorbell exits silently"
 # machine happens to carry.
 sed 's/command -v jq/command -v definitely-not-jq/' "$DRAIN" > "$S/drain-nojq.sh"
 chmod +x "$S/drain-nojq.sh"
+# The drain sources beb-pin.sh from its own directory, so a copy takes
+# the helper with it. This test is about jq, not about the pin.
+cp "$HERE/hooks/beb-pin.sh" "$S/beb-pin.sh"
 printf '%s' "$EV" | BEB_IDENTITY="$S/a" "$DRAIN" >"$S/jq.json" 2>/dev/null
 rc_jq=$?
 printf '%s' "$EV" | BEB_IDENTITY="$S/a" "$S/drain-nojq.sh" >"$S/py.json" 2>/dev/null

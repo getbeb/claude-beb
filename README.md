@@ -40,6 +40,12 @@ You can also name the identity explicitly:
 BEB_IDENTITY=~/work/backend claude
 ```
 
+An absolute path. beb refuses a relative pin, because it names a
+different directory from every working directory, and a session that
+enters a git worktree takes its cwd with it. A relative one already in
+the environment is resolved against the directory the session started
+in, and announced if that resolves to no identity.
+
 Unread mail is announced as context:
 
 ```text

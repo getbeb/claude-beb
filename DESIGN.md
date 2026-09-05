@@ -73,6 +73,20 @@ per invocation, re-armed at each boundary).
    and writing it there would re-pin on every directory change, which
    is the drift the pin exists to stop.
 
+   An absolute `BEB_IDENTITY` in the environment is the caller's word
+   and is never touched. A relative one is resolved, against the
+   directory the session started in -- `CLAUDE_PROJECT_DIR`, passed
+   from `hooks.json` because it is a command substitution rather than
+   an environment variable. beb refuses a relative pin, since it names
+   a different directory from every cwd, and Claude's own cwd follows
+   it into a git worktree where the identity does not live. Leaving it
+   alone would mean no identity at all, and the refusal that says so
+   is read by every hook here as "nothing in this directory", which is
+   how a coder sat with unread mail for ten minutes behind a pane that
+   looked healthy. A pin the caller set that resolves to nothing is
+   announced, because silence is right for a directory that is not an
+   identity and wrong for somebody who meant to be one.
+
 ## Behavior
 
 Two hooks, both armed on SessionStart and Stop.
